@@ -144,6 +144,3 @@ Use these topics on the repository page:
 - `pytest`
 - `docker`
 
-## License
-
-This project is currently maintained for research and benchmarking use. Add an explicit license before public distribution if you plan to downstream reuse or commercial use.
