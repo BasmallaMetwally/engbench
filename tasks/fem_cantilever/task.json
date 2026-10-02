@@ -1,0 +1,15 @@
+{
+  "name": "fem_cantilever",
+  "prompt_file": "README.md",
+  "workspace_files": {
+    "README.md": "README.md",
+    "example_params.json": "example_params.json",
+    "solution.py": "starter/solution.py"
+  },
+  "grade_timeout_s": 300,
+  "requires": [
+    "numpy",
+    "scipy",
+    "skfem"
+  ]
+}

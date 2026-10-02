@@ -1,0 +1,15 @@
+{
+  "name": "control_pid_tuning",
+  "prompt_file": "README.md",
+  "workspace_files": {
+    "README.md": "README.md",
+    "example_plant.json": "example_plant.json",
+    "sim.py": "sim.py",
+    "solution.py": "starter/solution.py"
+  },
+  "grade_timeout_s": 600,
+  "requires": [
+    "numpy",
+    "scipy"
+  ]
+}

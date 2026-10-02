@@ -1,0 +1,13 @@
+{
+  "name": "linear_model_fit",
+  "prompt_file": "README.md",
+  "workspace_files": {
+    "README.md": "README.md",
+    "example_data.json": "example_data.json",
+    "solution.py": "starter/solution.py"
+  },
+  "grade_timeout_s": 60,
+  "requires": [
+    "numpy"
+  ]
+}

@@ -1,0 +1,23 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  verify-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install numpy==1.26.4 scipy==1.13.1 scikit-fem==12.0.1 pytest pandas matplotlib tabulate
+      - name: Mutation guard (broken graders must be rejected)
+        run: pytest -q tests/test_mutants.py
+      - name: Reference solves, starter fails, cheats fail
+        run: pytest -q tests
+      - name: Harness smoke test (oracle must pass, null must fail)
+        run: |
+          python -m harness.run --task all --agent oracle --executor local --out /tmp/res
+          python -m harness.run --task all --agent null --executor local --out /tmp/res
+          python -m analysis.report --results /tmp/res --out /tmp/report
+      - name: Docker images build
+        run: |
+          docker build -t engbench-fem tasks/fem_cantilever
+          docker build -t engbench-pid tasks/control_pid_tuning

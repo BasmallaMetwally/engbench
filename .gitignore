@@ -1,0 +1,6 @@
+__pycache__/
+.pytest_cache/
+__MACOSX/
+.DS_Store
+results/*
+!results/.gitkeep

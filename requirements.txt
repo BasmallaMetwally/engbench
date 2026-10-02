@@ -1,0 +1,7 @@
+numpy
+scipy
+scikit-fem
+pandas
+matplotlib
+tabulate
+pytest
