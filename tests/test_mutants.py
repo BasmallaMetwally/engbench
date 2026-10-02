@@ -67,13 +67,12 @@ def _pid_mutants(ref_src: str):
 
 def _linear_mutants(ref_src: str):
     mutants = {}
-    mutants["slope_halved"] = _wrap_reference(ref_src, "fit_line", "a, b = _orig_fit_line(*args, **kwargs); return 0.5 * a, b")
-    mutants["intercept_zeroed"] = _wrap_reference(ref_src, "fit_line", "a, b = _orig_fit_line(*args, **kwargs); return a, 0.0")
+    mutants["modulus_halved"] = _wrap_reference(ref_src, "fit_line", "modulus, offset = _orig_fit_line(*args, **kwargs); return 0.5 * modulus, offset")
+    mutants["modulus_doubled"] = _wrap_reference(ref_src, "fit_line", "modulus, offset = _orig_fit_line(*args, **kwargs); return 2.0 * modulus, offset")
+    mutants["offset_shifted"] = _wrap_reference(ref_src, "fit_line", "modulus, offset = _orig_fit_line(*args, **kwargs); return modulus, offset + 25.0")
     mutants["bad_constant"] = textwrap.dedent("""
-        import numpy as np
-
         def fit_line(samples):
-            return 0.0, 999.0
+            return 0.0, 0.0
     """)
     return mutants
 

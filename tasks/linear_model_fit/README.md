@@ -1,21 +1,13 @@
-# Task: Fit a line from noisy samples
+# Task: Characterize a material from tensile-test data
 
 Implement `fit_line(samples)` in `/workspace/solution.py`.
 
-The input is a list of samples, each sample is either:
-- a dict with keys `x` and `y`, or
-- a 2-tuple `(x, y)`.
+The samples come from a uniaxial tensile test in the material's linear-elastic range. Each sample is either a dict with `x` and `y` keys or a 2-tuple `(strain, stress_mpa)`. Here `x` is dimensionless engineering strain and `y` is measured stress in MPa.
 
-The target is a line `y = a * x + b` with small noise. Return the coefficients as a 2-tuple `(a, b)`.
+Assume the measurement model `stress = E * strain + offset`, where `E` is Young's modulus in MPa and `offset` is a small stress-zero measurement bias in MPa. Return `(E, offset)` as a 2-tuple.
 
 ## Requirements
 
-The grader evaluates the function on hidden seeds and checks that:
-1. the fitted slope is close to the true slope,
-2. the fitted intercept is close to the true intercept,
-3. the prediction error on hidden points is low,
-4. the implementation does not crash and returns finite values.
+The grader evaluates hidden, seeded tensile-test datasets and checks that the estimated modulus and stress offset are close to their generating values, predictions have low mean-squared error, and all returned values are finite.
 
-Use the exact hidden data generator from the grader if needed; do not modify the grader.
-
-Your solution should be robust to a few outliers and avoid using any external packages beyond NumPy.
+The task is complete when the reference passes, the starter fails, and at least four deliberately incorrect material models fail. Use NumPy; do not modify the grader or rely on hidden data.
