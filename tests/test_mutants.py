@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import sys
 import textwrap
@@ -19,6 +20,7 @@ def _load_grader(task: str):
 
 
 def _write_mutant(task: str, mutant_name: str, body: str, tmp_path: Path) -> str:
+    ast.parse(body)
     target = tmp_path / f"{task}_{mutant_name}.py"
     target.write_text(body)
     return str(target)
@@ -26,12 +28,7 @@ def _write_mutant(task: str, mutant_name: str, body: str, tmp_path: Path) -> str
 
 def _wrap_reference(ref_src: str, func_name: str, override: str) -> str:
     renamed = ref_src.strip().replace(f"def {func_name}", f"def _orig_{func_name}", 1)
-    return textwrap.dedent(f"""
-        {renamed}
-
-        def {func_name}(*args, **kwargs):
-            {override}
-    """)
+    return f"{renamed}\n\n\ndef {func_name}(*args, **kwargs):\n    {override}\n"
 
 
 def _fem_mutants(ref_src: str):
@@ -94,19 +91,21 @@ def test_mutant_suite_rejects_broken_reference_variants(tmp_path):
         "linear_model_fit": _linear_mutants((ROOT / "tasks" / "linear_model_fit" / "reference" / "solution.py").read_text()),
     }
 
-    total = 0
-    killed = 0
-    mutation_rows = []
+    results = []
     for task, mutants in cases.items():
         for name, grade in _mutant_results(task, tmp_path, mutants):
-            total += 1
-            mutation_rows.append({"task": task, "mutant": name, "killed": int(not grade["passed"]), "passed": bool(grade["passed"])})
-            if not grade["passed"]:
-                killed += 1
-            else:
-                raise AssertionError(f"mutation '{task}:{name}' survived: grade={grade!r}")
+            results.append((task, name, grade))
 
+    crashed = [f"{task}:{name}" for task, name, grade in results if "runs_without_error" in grade["checks"]]
+    survivors = [f"{task}:{name}" for task, name, grade in results if grade["passed"]]
+    assert not crashed, f"mutants crashed instead of being rejected by physics: {crashed}"
+    assert not survivors, f"mutants survived: {survivors}"
+    for task, name, grade in results:
+        if task == "fem_cantilever" and name == "zero_out":
+            assert not grade["checks"].get("accuracy_vs_analytical", True)
+
+    total = len(results)
+    killed = sum(not grade["passed"] for _, _, grade in results)
     score = killed / total
     assert score >= MUTATION_SCORE_THRESHOLD, f"mutation score too low: {score:.2%} ({killed}/{total})"
     print(f"mutation score: {score:.2%} ({killed}/{total})")
-    assert score >= MUTATION_SCORE_THRESHOLD

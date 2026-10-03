@@ -32,14 +32,14 @@ def grade(path: str) -> dict:
             p = make_params(s); ref = analytical_deflection(p)
             vals = [fn(p, nx, ny) for nx, ny in MESHES]
             errs.append(abs(vals[-1] - ref) / ref)
-            convs.append(abs(vals[-1] - vals[-2]) / vals[-1])
+            convs.append(abs(vals[-1] - vals[-2]) / max(abs(vals[-1]), 1e-30))
             # linearity: doubling load must double deflection
             p2 = dict(p, P=2 * p["P"])
-            scale.append(abs(fn(p2, *MESHES[-1]) / vals[-1] - 2.0))
+            scale.append(abs(fn(p2, *MESHES[-1]) / max(abs(vals[-1]), 1e-30) - 2.0))
         # must be a real discretisation: result has to react to the mesh
         coarse = fn(make_params(HIDDEN_SEEDS[0]), 2, 1)
         fine = fn(make_params(HIDDEN_SEEDS[0]), *MESHES[-1])
-        checks["depends_on_mesh"] = bool(abs(coarse - fine) / fine > 1e-4)
+        checks["depends_on_mesh"] = bool(abs(coarse - fine) / max(abs(fine), 1e-30) > 1e-4)
         # thick beam: closed-form beam theory is wrong here, FEM is not
         truth = load_ref()(STUBBY, 64, 32)
         checks["stubby_matches_fem"] = bool(abs(fn(STUBBY, 32, 16) - truth) / truth < STUBBY_TOL)
