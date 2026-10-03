@@ -11,16 +11,22 @@ import numpy as np
 import pandas as pd
 
 
-def ci(x, n=2000, seed=0):
-    """Bootstrap 95% confidence interval for a binary or numeric sample."""
+def ci(x):
+    """Return the two-sided 95% Wilson score interval for binary outcomes."""
     x = np.asarray(x, dtype=float)
     if x.size == 0:
         return np.array([np.nan, np.nan])
-    if x.size == 1:
-        return np.array([x[0], x[0]])
-    rng = np.random.default_rng(seed)
-    boot = np.array([rng.choice(x, x.size, replace=True).mean() for _ in range(n)])
-    return np.percentile(boot, [2.5, 97.5])
+    if not np.isin(x, [0.0, 1.0]).all():
+        raise ValueError("Wilson intervals require binary observations (0 or 1)")
+    n = x.size
+    successes = float(x.sum())
+    z = 1.959963984540054
+    z2 = z * z
+    proportion = successes / n
+    denominator = 1.0 + z2 / n
+    center = (proportion + z2 / (2.0 * n)) / denominator
+    half_width = z * np.sqrt(proportion * (1.0 - proportion) / n + z2 / (4.0 * n * n)) / denominator
+    return np.array([max(0.0, center - half_width), min(1.0, center + half_width)])
 
 
 def load(results_dir: str) -> pd.DataFrame:
@@ -38,7 +44,8 @@ def summarize(df: pd.DataFrame, price_in=None, price_out=None) -> pd.DataFrame:
     ci_rows = []
     for (task, agent), group in g:
         lo, hi = ci(group["passed"].to_numpy(dtype=float))
-        ci_rows.append({"task": task, "agent": agent, "pass_rate_ci_low": float(lo), "pass_rate_ci_high": float(hi)})
+        ci_rows.append({"task": task, "agent": agent,
+                "pass_rate_wilson_ci_low": float(lo), "pass_rate_wilson_ci_high": float(hi)})
     if ci_rows:
         s = s.merge(pd.DataFrame(ci_rows), on=["task", "agent"], how="left")
     if price_in is not None and price_out is not None:

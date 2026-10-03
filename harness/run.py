@@ -66,6 +66,8 @@ def main(argv=None):
     ap.add_argument("--executor", choices=["local", "docker"], default="docker")
     ap.add_argument("--trials", type=int, default=1)
     ap.add_argument("--max-steps", type=int, default=30)
+    ap.add_argument("--agent-timeout", type=int, default=300,
+                    help="maximum seconds allowed for each command-agent trial (default: 300)")
     ap.add_argument("--out", default="results")
     ap.add_argument("--allow-unsafe-local", action="store_true",
                     help="permit an LLM agent to run bash directly on this machine (NOT recommended)")
@@ -75,7 +77,10 @@ def main(argv=None):
         ap.error("--agent cmd needs --cmd")
     if a.agent == "cmd" and a.executor == "local" and not a.allow_unsafe_local:
         ap.error("Command agents must run in --executor docker (local has no isolation). Override: --allow-unsafe-local")
-    agent = {"null": NullAgent, "oracle": OracleAgent}.get(a.agent, lambda: CommandAgent(a.cmd, a.agent_name))()
+    if a.agent == "cmd":
+        agent = CommandAgent(a.cmd, a.agent_name, timeout=a.agent_timeout)
+    else:
+        agent = {"null": NullAgent, "oracle": OracleAgent}[a.agent]()
     ex_cls = LocalExecutor if a.executor == "local" else DockerExecutor
     tasks = all_tasks() if a.task == "all" else [a.task]
     for task in tasks:

@@ -1,4 +1,6 @@
+import json
 import os
+import time
 
 import numpy as np
 import pytest
@@ -28,9 +30,37 @@ def test_command_agent_crash(tmp_path):
     assert _cmd_run(tmp_path, cmd)["failure_type"] == "crash"
 
 
+def test_command_agent_stdout_stderr_are_saved(tmp_path):
+    rec = _cmd_run(tmp_path, "printf 'agent stdout'; printf 'agent stderr' >&2")
+    transcript_path = tmp_path / "transcripts" / "fem_cantilever__cmd__0.json"
+    transcript = json.loads(transcript_path.read_text())
+    assert rec["failure_type"] != "agent_timeout"
+    assert transcript[0]["stdout"] == "agent stdout"
+    assert transcript[0]["stderr"] == "agent stderr"
+    assert transcript[0]["return_code"] == 0
+
+
 def test_command_agent_timeout(tmp_path):
     rec = run_one("fem_cantilever", CommandAgent("sleep 5", timeout=1), LocalExecutor, 0, 1, str(tmp_path))
     assert rec["error"] == "timeout" and rec["failure_type"] == "agent_timeout"
+
+
+def test_cli_agent_timeout_records_timeout_and_transcript(tmp_path):
+    out = str(tmp_path / "results")
+    started = time.monotonic()
+    main([
+        "--task", "fem_cantilever", "--agent", "cmd", "--cmd", "sleep 30",
+        "--agent-name", "slow", "--executor", "local", "--allow-unsafe-local",
+        "--agent-timeout", "5", "--out", out,
+    ])
+    elapsed = time.monotonic() - started
+
+    result = json.loads((tmp_path / "results" / "fem_cantilever__slow__0.json").read_text())
+    transcript = json.loads((tmp_path / "results" / "transcripts" / "fem_cantilever__slow__0.json").read_text())
+    assert 4.5 <= elapsed < 10.0
+    assert result["error"] == "timeout"
+    assert result["failure_type"] == "agent_timeout"
+    assert transcript[0]["timed_out"] is True
 
 
 def test_agent_cannot_escape_workspace():
@@ -45,6 +75,13 @@ def test_ci_95pct_on_binary_pass_rates():
     x = np.array([0.0, 1.0, 1.0, 1.0], dtype=float)
     lo, hi = ci(x)
     assert 0.0 <= lo <= 0.75 <= hi <= 1.0
+
+
+def test_wilson_interval_handles_all_fail_and_all_pass_samples():
+    fail_lo, fail_hi = ci([0, 0, 0, 0, 0])
+    pass_lo, pass_hi = ci([1, 1, 1, 1, 1])
+    assert fail_lo == 0.0 and fail_hi == pytest.approx(0.4345, abs=0.0001)
+    assert pass_lo == pytest.approx(0.5655, abs=0.0001) and pass_hi == 1.0
 
 
 # ---- failure taxonomy ----------------------------------------------------------------------------

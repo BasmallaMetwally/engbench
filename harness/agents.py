@@ -33,11 +33,11 @@ class OracleAgent(Agent):
 class CommandAgent(Agent):
     """Runs ANY external agent as a shell command inside the workspace."""
 
-    def __init__(self, cmd: str, name: str = "cmd", timeout: int = 1800):
+    def __init__(self, cmd: str, name: str = "cmd", timeout: int = 300):
         self.cmd, self.name, self.timeout = cmd, name, timeout
 
     def run(self, ex, prompt, max_steps):
-        out = ex.bash(self.cmd, timeout=self.timeout)
-        err = "timeout" if out.startswith("[timeout") else None
+        result = ex.bash_capture(self.cmd, timeout=self.timeout)
+        err = "timeout" if result["timed_out"] else None
         return dict(steps=1, input_tokens=0, output_tokens=0,
-                    transcript=[{"role": "agent", "content": out}], error=err)
+                    transcript=[{"role": "agent", **result}], error=err)

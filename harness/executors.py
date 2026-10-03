@@ -3,7 +3,7 @@
 LocalExecutor  - temp dir on the host. For harness tests / oracle baselines ONLY (no isolation).
 DockerExecutor - one container per run, no network. Use this for real agent evaluations.
 """
-import json, os, shutil, subprocess, sys, tempfile
+import json, os, shutil, signal, subprocess, sys, tempfile
 from abc import ABC, abstractmethod
 
 TASKS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tasks")
@@ -17,6 +17,30 @@ def load_manifest(name):
 
 def _trunc(s: str) -> str:
     return s if len(s) <= MAX_OUT else s[:MAX_OUT // 2] + "\n...[truncated]...\n" + s[-MAX_OUT // 2:]
+
+
+def _run_process(args, cwd: str, timeout: int) -> dict:
+    process = subprocess.Popen(
+        args,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    timed_out = False
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        os.killpg(process.pid, signal.SIGKILL)
+        stdout, stderr = process.communicate()
+    return {
+        "stdout": _trunc(stdout or ""),
+        "stderr": _trunc(stderr or ""),
+        "return_code": process.returncode,
+        "timed_out": timed_out,
+    }
 
 
 def _parse_grade(stdout: str) -> dict:
@@ -40,6 +64,8 @@ class Executor(ABC):
     def stop(self): ...
     @abstractmethod
     def bash(self, cmd: str, timeout: int = 120) -> str: ...
+    @abstractmethod
+    def bash_capture(self, cmd: str, timeout: int = 120) -> dict: ...
     @abstractmethod
     def write_file(self, path: str, content: str) -> str: ...
     @abstractmethod
@@ -79,11 +105,16 @@ class LocalExecutor(Executor):
         return full
 
     def bash(self, cmd, timeout=120):
-        try:
-            p = subprocess.run(["bash", "-c", cmd], cwd=self.ws, capture_output=True, text=True, timeout=timeout)
-            return _trunc(f"[exit {p.returncode}]\n{p.stdout}{p.stderr}")
-        except subprocess.TimeoutExpired:
+        result = self.bash_capture(cmd, timeout)
+        if result["timed_out"]:
             return f"[timeout after {timeout}s]"
+        return _trunc(f"[exit {result['return_code']}]\n{result['stdout']}{result['stderr']}")
+
+    def bash_capture(self, cmd, timeout=120):
+        try:
+            return _run_process(["bash", "-c", cmd], cwd=self.ws, timeout=timeout)
+        except OSError as e:
+            return {"stdout": "", "stderr": str(e), "return_code": 127, "timed_out": False}
 
     def write_file(self, path, content):
         full = self._safe(path); os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -114,12 +145,20 @@ class DockerExecutor(Executor):
     def stop(self): subprocess.run(["docker", "rm", "-f", self.cid], capture_output=True)
 
     def bash(self, cmd, timeout=120):
-        try:
-            p = subprocess.run(["docker", "exec", "-w", "/workspace", self.cid, "bash", "-c", cmd],
-                               capture_output=True, text=True, timeout=timeout)
-            return _trunc(f"[exit {p.returncode}]\n{p.stdout}{p.stderr}")
-        except subprocess.TimeoutExpired:
+        result = self.bash_capture(cmd, timeout)
+        if result["timed_out"]:
             return f"[timeout after {timeout}s]"
+        return _trunc(f"[exit {result['return_code']}]\n{result['stdout']}{result['stderr']}")
+
+    def bash_capture(self, cmd, timeout=120):
+        try:
+            return _run_process(
+                ["docker", "exec", "-w", "/workspace", self.cid, "bash", "-c", cmd],
+                cwd=self.tdir,
+                timeout=timeout,
+            )
+        except OSError as e:
+            return {"stdout": "", "stderr": str(e), "return_code": 127, "timed_out": False}
 
     def write_file(self, path, content):
         if not path.startswith("/"): path = "/workspace/" + path
