@@ -1,4 +1,5 @@
 import importlib.util, json, math, sys, time
+from statistics import median
 
 HIDDEN_SEEDS = [7, 13, 29]
 
@@ -55,7 +56,11 @@ def grade(path: str) -> dict:
     t0, checks, detail = time.time(), {}, {}
     try:
         fn = load(path)
-        seed_checks = {"modulus_accuracy": [], "offset_accuracy": [], "elastic_fit_error": []}
+        seed_checks = {
+            "modulus_accuracy": [],
+            "offset_accuracy": [],
+            "elastic_fit_error": [],
+        }
         for s in HIDDEN_SEEDS:
             data = make_samples(s)
             pred = fn(data["samples"])
@@ -63,18 +68,18 @@ def grade(path: str) -> dict:
             modulus_err = abs(modulus_hat - data["modulus_mpa"])
             offset_err = abs(offset_hat - data["stress_offset_mpa"])
             elastic = [item for item in data["samples"] if item["x"] < data["yield_strain"]]
-            residuals = [modulus_hat * item["x"] + offset_hat - item["y"] for item in elastic]
-            elastic_mse = sum(residual * residual for residual in residuals) / len(residuals)
+            residuals = [abs(modulus_hat * item["x"] + offset_hat - item["y"]) for item in elastic]
+            elastic_median_abs_residual = median(residuals)
             finite = math.isfinite(modulus_hat) and math.isfinite(offset_hat)
-            seed_checks["modulus_accuracy"].append(finite and modulus_err <= 0.04 * data["modulus_mpa"])
-            seed_checks["offset_accuracy"].append(finite and offset_err <= 5.0)
-            seed_checks["elastic_fit_error"].append(finite and elastic_mse <= 1200.0)
+            seed_checks["modulus_accuracy"].append(finite and modulus_err <= 0.025 * data["modulus_mpa"])
+            seed_checks["offset_accuracy"].append(finite and offset_err <= 3.0)
+            seed_checks["elastic_fit_error"].append(finite and elastic_median_abs_residual <= 4.0)
             detail[f"seed{s}"] = {
                 "youngs_modulus_mpa": round(modulus_hat, 2),
                 "stress_offset_mpa": round(offset_hat, 4),
                 "modulus_error_mpa": round(modulus_err, 2),
                 "offset_error_mpa": round(offset_err, 4),
-                "elastic_mse_mpa2": round(elastic_mse, 4),
+                "elastic_median_abs_residual_mpa": round(elastic_median_abs_residual, 4),
             }
         checks = {name: all(values) for name, values in seed_checks.items()}
     except Exception as e:

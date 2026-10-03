@@ -8,6 +8,6 @@ Estimate Young's modulus from the elastic portion only; fitting one line to the 
 
 ## Requirements
 
-The grader uses hidden seeded curves and checks modulus accuracy, stress-offset accuracy, and residual error over the hidden elastic range. The reference identifies a robust two-segment fit; solutions must identify the elastic-to-yield transition and handle outliers.
+The grader uses hidden seeded curves and checks that Young's modulus is within 2.5% of the generating value, the stress offset is within 3 MPa, and the median absolute residual over the elastic range is at most 4 MPa. The reference identifies a robust two-segment fit; solutions must identify the elastic-to-yield transition and handle outliers.
 
 Return either `(modulus_mpa, offset_mpa)` or a mapping with `youngs_modulus_mpa` and `stress_offset_mpa`. Use NumPy; do not modify the grader or rely on hidden data.

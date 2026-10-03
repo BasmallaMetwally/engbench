@@ -56,6 +56,32 @@ def test_global_polyfit_fails_to_identify_elastic_modulus(tmp_path):
     assert not result["checks"]["modulus_accuracy"]
 
 
+def test_systematic_modulus_bias_exceeds_calibrated_tolerance(tmp_path):
+    reference_source = open(ref(TASK), encoding="utf-8").read()
+    renamed_reference = reference_source.replace("def fit_line", "def _reference_fit_line", 1)
+    body = (
+        f"{renamed_reference}\n\n"
+        "def fit_line(*args, **kwargs):\n"
+        "    modulus, offset = _reference_fit_line(*args, **kwargs)\n"
+        "    return 1.03 * modulus, offset\n"
+    )
+    result = task_grade(TASK, _write_solution(tmp_path, "modulus_bias_3pct", body))
+    assert not result["checks"]["modulus_accuracy"]
+
+
+def test_systematic_offset_bias_exceeds_calibrated_tolerance(tmp_path):
+    reference_source = open(ref(TASK), encoding="utf-8").read()
+    renamed_reference = reference_source.replace("def fit_line", "def _reference_fit_line", 1)
+    body = (
+        f"{renamed_reference}\n\n"
+        "def fit_line(*args, **kwargs):\n"
+        "    modulus, offset = _reference_fit_line(*args, **kwargs)\n"
+        "    return modulus, offset + 6.0\n"
+    )
+    result = task_grade(TASK, _write_solution(tmp_path, "offset_bias_6mpa", body))
+    assert not result["checks"]["offset_accuracy"]
+
+
 def test_reference_generalizes_to_unseen_noisy_outlier_curves():
     grader_path = Path(__file__).resolve().parents[1] / "tasks" / TASK / "grader.py"
     spec = importlib.util.spec_from_file_location("linear_model_fit_stress_test_grader", grader_path)
