@@ -1,4 +1,6 @@
+import importlib.util
 import textwrap
+from pathlib import Path
 
 from helpers import ref, starter, task_grade
 
@@ -52,3 +54,17 @@ def test_global_polyfit_fails_to_identify_elastic_modulus(tmp_path):
     """)
     result = task_grade(TASK, _write_solution(tmp_path, "global_polyfit", body))
     assert not result["checks"]["modulus_accuracy"]
+
+
+def test_reference_generalizes_to_unseen_noisy_outlier_curves():
+    grader_path = Path(__file__).resolve().parents[1] / "tasks" / TASK / "grader.py"
+    spec = importlib.util.spec_from_file_location("linear_model_fit_stress_test_grader", grader_path)
+    grader = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(grader)
+    fit_line = grader.load(ref(TASK))
+
+    for seed in range(100, 120):
+        data = grader.make_samples(seed, noise_std=6.0, outlier_range=(250.0, 400.0))
+        modulus_hat, offset_hat = fit_line(data["samples"])
+        assert abs(modulus_hat - data["modulus_mpa"]) <= 0.07 * data["modulus_mpa"], seed
+        assert abs(offset_hat - data["stress_offset_mpa"]) <= 12.0, seed

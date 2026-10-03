@@ -3,7 +3,7 @@ import importlib.util, json, math, sys, time
 HIDDEN_SEEDS = [7, 13, 29]
 
 
-def make_samples(seed: int):
+def make_samples(seed: int, noise_std: float = 2.0, outlier_range=(70.0, 140.0)):
     import numpy as np
     rng = np.random.default_rng(seed)
     modulus_mpa = float(rng.uniform(90_000.0, 210_000.0))
@@ -17,13 +17,16 @@ def make_samples(seed: int):
         stress_offset_mpa
         + modulus_mpa * elastic_strain
         + hardening_mpa * plastic_strain
-        + rng.normal(0.0, 2.0, size=strains.shape)
+        + rng.normal(0.0, noise_std, size=strains.shape)
     )
     elastic_indices = np.flatnonzero(strains < yield_strain)
     plastic_indices = np.flatnonzero(strains > yield_strain)
     outlier_indices = [int(rng.choice(elastic_indices))]
     outlier_indices.extend(int(i) for i in rng.choice(plastic_indices, size=2, replace=False))
-    stresses[outlier_indices] += rng.choice([-1.0, 1.0], size=3) * rng.uniform(70.0, 140.0, size=3)
+    stresses[outlier_indices] += (
+        rng.choice([-1.0, 1.0], size=3)
+        * rng.uniform(outlier_range[0], outlier_range[1], size=3)
+    )
     samples = [{"x": float(strain), "y": float(stress)} for strain, stress in zip(strains, stresses)]
     return dict(
         modulus_mpa=modulus_mpa,
