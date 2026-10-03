@@ -1,5 +1,6 @@
 FROM python:3.11-slim
-WORKDIR /workspace
 RUN pip install --no-cache-dir numpy
-COPY . /workspace
+WORKDIR /workspace
+COPY README.md example_data.json ./
+COPY starter/solution.py ./solution.py
 CMD ["bash"]
