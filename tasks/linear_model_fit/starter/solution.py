@@ -1,10 +1,7 @@
-"""
-Implement `fit_line(samples)`.
-Return a 2-tuple `(a, b)` so that `y ~= a * x + b`.
-"""
+"""Estimate Young's modulus from the elastic portion of a tensile curve."""
 import numpy as np
 
 
 def fit_line(samples):
-    # TODO: fit a straight line to the samples using least squares.
+    # TODO: identify the elastic range before estimating modulus and offset.
     raise NotImplementedError

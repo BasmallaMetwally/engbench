@@ -1,13 +1,13 @@
-# Task: Characterize a material from tensile-test data
+# Task: Identify Young's modulus from a tensile curve
 
 Implement `fit_line(samples)` in `/workspace/solution.py`.
 
-The samples come from a uniaxial tensile test in the material's linear-elastic range. Each sample is either a dict with `x` and `y` keys or a 2-tuple `(strain, stress_mpa)`. Here `x` is dimensionless engineering strain and `y` is measured stress in MPa.
+The input is a complete uniaxial tensile-test stress-strain curve, including the initial elastic range, yielding, and post-yield strain hardening. It contains measurement noise and a few outliers. Each sample is either a dict with `x` and `y` keys or a 2-tuple `(strain, stress_mpa)`. Here `x` is dimensionless engineering strain and `y` is measured stress in MPa.
 
-Assume the measurement model `stress = E * strain + offset`, where `E` is Young's modulus in MPa and `offset` is a small stress-zero measurement bias in MPa. Return `(E, offset)` as a 2-tuple.
+Estimate Young's modulus from the elastic portion only; fitting one line to the entire curve is incorrect because the post-yield slope is different. Return `(E, offset)` as a 2-tuple, where `E` is Young's modulus in MPa and `offset` is the stress-zero measurement bias in MPa.
 
 ## Requirements
 
-The grader evaluates hidden, seeded tensile-test datasets and checks that the estimated modulus and stress offset are close to their generating values, predictions have low mean-squared error, and all returned values are finite.
+The grader uses hidden seeded curves and checks modulus accuracy, stress-offset accuracy, and residual error over the hidden elastic range. The reference identifies a robust two-segment fit; solutions must identify the elastic-to-yield transition and handle outliers.
 
-The task is complete when the reference passes, the starter fails, and at least four deliberately incorrect material models fail. Use NumPy; do not modify the grader or rely on hidden data.
+Return either `(modulus_mpa, offset_mpa)` or a mapping with `youngs_modulus_mpa` and `stress_offset_mpa`. Use NumPy; do not modify the grader or rely on hidden data.

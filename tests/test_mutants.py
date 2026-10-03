@@ -71,6 +71,25 @@ def _linear_mutants(ref_src: str):
         def fit_line(samples):
             return 0.0, 0.0
     """)
+    mutants["global_polyfit"] = textwrap.dedent("""
+        import numpy as np
+
+        def fit_line(samples):
+            xs = np.asarray([item["x"] if isinstance(item, dict) else item[0] for item in samples])
+            ys = np.asarray([item["y"] if isinstance(item, dict) else item[1] for item in samples])
+            slope, offset = np.polyfit(xs, ys, 1)
+            return float(slope), float(offset)
+    """)
+    mutants["post_yield_only"] = textwrap.dedent("""
+        import numpy as np
+
+        def fit_line(samples):
+            xs = np.asarray([item["x"] if isinstance(item, dict) else item[0] for item in samples])
+            ys = np.asarray([item["y"] if isinstance(item, dict) else item[1] for item in samples])
+            start = int(xs.size * 0.35)
+            slope, offset = np.polyfit(xs[start:], ys[start:], 1)
+            return float(slope), float(offset)
+    """)
     return mutants
 
 

@@ -38,3 +38,17 @@ def test_four_incorrect_material_models_fail(tmp_path):
                 {override}
         """)
         assert not task_grade(TASK, _write_solution(tmp_path, name, body))["passed"], name
+
+
+def test_global_polyfit_fails_to_identify_elastic_modulus(tmp_path):
+    body = textwrap.dedent("""
+        import numpy as np
+
+        def fit_line(samples):
+            xs = np.asarray([item["x"] if isinstance(item, dict) else item[0] for item in samples])
+            ys = np.asarray([item["y"] if isinstance(item, dict) else item[1] for item in samples])
+            slope, offset = np.polyfit(xs, ys, 1)
+            return float(slope), float(offset)
+    """)
+    result = task_grade(TASK, _write_solution(tmp_path, "global_polyfit", body))
+    assert not result["checks"]["modulus_accuracy"]

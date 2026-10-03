@@ -6,12 +6,31 @@ HIDDEN_SEEDS = [7, 13, 29]
 def make_samples(seed: int):
     import numpy as np
     rng = np.random.default_rng(seed)
-    modulus_mpa = float(rng.uniform(60_000.0, 210_000.0))
-    stress_offset_mpa = float(rng.uniform(-5.0, 5.0))
-    strains = np.linspace(0.0001, 0.0025, 25)
-    stresses = modulus_mpa * strains + stress_offset_mpa + rng.normal(0.0, 1.0, size=strains.shape)
+    modulus_mpa = float(rng.uniform(90_000.0, 210_000.0))
+    stress_offset_mpa = float(rng.uniform(-15.0, 15.0))
+    yield_strain = float(rng.uniform(0.0025, 0.0050))
+    hardening_mpa = modulus_mpa * float(rng.uniform(0.04, 0.12))
+    strains = np.linspace(0.0, 0.02, 81)
+    elastic_strain = np.minimum(strains, yield_strain)
+    plastic_strain = np.maximum(strains - yield_strain, 0.0)
+    stresses = (
+        stress_offset_mpa
+        + modulus_mpa * elastic_strain
+        + hardening_mpa * plastic_strain
+        + rng.normal(0.0, 2.0, size=strains.shape)
+    )
+    elastic_indices = np.flatnonzero(strains < yield_strain)
+    plastic_indices = np.flatnonzero(strains > yield_strain)
+    outlier_indices = [int(rng.choice(elastic_indices))]
+    outlier_indices.extend(int(i) for i in rng.choice(plastic_indices, size=2, replace=False))
+    stresses[outlier_indices] += rng.choice([-1.0, 1.0], size=3) * rng.uniform(70.0, 140.0, size=3)
     samples = [{"x": float(strain), "y": float(stress)} for strain, stress in zip(strains, stresses)]
-    return dict(modulus_mpa=modulus_mpa, stress_offset_mpa=stress_offset_mpa, samples=samples)
+    return dict(
+        modulus_mpa=modulus_mpa,
+        stress_offset_mpa=stress_offset_mpa,
+        yield_strain=yield_strain,
+        samples=samples,
+    )
 
 
 def load(path):
@@ -33,29 +52,28 @@ def grade(path: str) -> dict:
     t0, checks, detail = time.time(), {}, {}
     try:
         fn = load(path)
-        ok = True
+        seed_checks = {"modulus_accuracy": [], "offset_accuracy": [], "elastic_fit_error": []}
         for s in HIDDEN_SEEDS:
             data = make_samples(s)
             pred = fn(data["samples"])
             modulus_hat, offset_hat = normalize(pred, data["samples"])
             modulus_err = abs(modulus_hat - data["modulus_mpa"])
             offset_err = abs(offset_hat - data["stress_offset_mpa"])
-            xs = [item["x"] for item in data["samples"]]
-            ys = [item["y"] for item in data["samples"]]
-            y_pred = [modulus_hat * strain + offset_hat for strain in xs]
-            mse = sum((yp - y) ** 2 for yp, y in zip(y_pred, ys)) / len(ys)
-            ok &= math.isfinite(modulus_hat) and math.isfinite(offset_hat)
-            ok &= modulus_err <= 800.0
-            ok &= offset_err <= 2.5
-            ok &= mse <= 2.5
+            elastic = [item for item in data["samples"] if item["x"] < data["yield_strain"]]
+            residuals = [modulus_hat * item["x"] + offset_hat - item["y"] for item in elastic]
+            elastic_mse = sum(residual * residual for residual in residuals) / len(residuals)
+            finite = math.isfinite(modulus_hat) and math.isfinite(offset_hat)
+            seed_checks["modulus_accuracy"].append(finite and modulus_err <= 0.04 * data["modulus_mpa"])
+            seed_checks["offset_accuracy"].append(finite and offset_err <= 5.0)
+            seed_checks["elastic_fit_error"].append(finite and elastic_mse <= 1200.0)
             detail[f"seed{s}"] = {
                 "youngs_modulus_mpa": round(modulus_hat, 2),
                 "stress_offset_mpa": round(offset_hat, 4),
                 "modulus_error_mpa": round(modulus_err, 2),
                 "offset_error_mpa": round(offset_err, 4),
-                "mse_mpa2": round(mse, 4),
+                "elastic_mse_mpa2": round(elastic_mse, 4),
             }
-        checks = {"fit_close": bool(ok)}
+        checks = {name: all(values) for name, values in seed_checks.items()}
     except Exception as e:
         checks = {"runs_without_error": False}
         detail = {"error": repr(e)}
